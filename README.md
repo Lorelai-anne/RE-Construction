@@ -1,5 +1,7 @@
 # RE-Construction
 
+Unity editor version 6000.0.36f1
+
 This is the repository for the RE: Construction Project
 
 There is an Assets, Scripts, Scenes, and Prefab folder
