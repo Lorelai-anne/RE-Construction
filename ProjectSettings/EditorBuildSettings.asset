@@ -8,6 +8,11 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Lorelai.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/Besu.unity
+    guid: 2aa654cb7a803a147977212e21f295e5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: f153d4af6e4fbe540a5e44aa8a6bc5f8, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 462c3f27839d4fb498585cfb50c296ec, type: 2}
   m_UseUCBPForAssetBundles: 0
