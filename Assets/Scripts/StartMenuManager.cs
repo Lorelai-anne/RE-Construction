@@ -53,7 +53,7 @@ public class StartMenuManager : MonoBehaviour
 
     void Update()
     {
-        if (!gameStarted && Input.GetKeyDown(KeyCode.LeftShift))
+        if (!gameStarted && (Input.GetKeyDown(KeyCode.LeftShift) || OVRInput.GetDown(OVRInput.Button.One)))
         {
             if (startText != null)
                 startText.text = "";

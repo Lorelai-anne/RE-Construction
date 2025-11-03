@@ -73,7 +73,7 @@ public class TurnManager : MonoBehaviour
         }
 
         // Allow skipping the player’s turn
-        if (participants[currentIndex].isUser && Input.GetKeyDown(KeyCode.Space))
+        if (participants[currentIndex].isUser && (Input.GetKeyDown(KeyCode.Space) || OVRInput.GetDown(OVRInput.Button.One)))
             SkipTurn();
     }
 
@@ -117,7 +117,7 @@ public class TurnManager : MonoBehaviour
             while (elapsed < duration)
             {
                 timerText.text = $"Time Left: {Mathf.Ceil(duration - elapsed)}s";
-                if (current.isUser && Input.GetKeyDown(KeyCode.Space))
+                if ((current.isUser && Input.GetKeyDown(KeyCode.Space)) || OVRInput.GetDown(OVRInput.Button.One))
                     break;
                 elapsed += Time.deltaTime;
                 yield return null;
