@@ -1,68 +1,96 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using TMPro;
 
-// Handles the flow of turns between user and NPC participants
+/// <summary>
+/// FOR BESU ->
+/// variables mentioned here will be marked lower down with     //////////////////////////////////////
+/// lastUserSubmittedText == the user input variable where the input is being held, you can push this to the AI models
+/// duration == the length of the turns
+/// npcLine == the response that is being printed, possibly you can hold the AI respons here aftere getting it from the model
+/// 
+/// Turn cycle method : handling the Ai responses, in this line
+/// p.npcLine = getAIResponse(lastUserSubmittedText);
+/// is where the getAiResponse is being called
+/// 
+/// Currently getAiResponse is just assigning npcLine the valuye of lastUserSubmittedText, but feel free to change it or the type of method if neccessary
+/// </summary>
+
 public class TurnManager : MonoBehaviour
 {
     [System.Serializable]
     public class Participant
     {
-        public GameObject character;   // The actual character GameObject in the scene
-        public Light turnLight;        // A light that indicates whose turn it is
-        public bool isUser;            // Whether this participant is the player or an NPC
-        [TextArea] public string[] npcLines; // Dialogue lines for NPCs
-        public Transform textAnchor;   // Where the text should appear for this character
+        public GameObject character;
+        public Light turnLight;
+        public bool isUser;
+        [TextArea] public string npcLine;  //////////////////////////////////////
+        public Transform textAnchor;
     }
 
+    [Header("Participants")]
     public Participant[] participants;
-    public int currentIndex = 0;       // Keeps track of whose turn it currently is
-    public float typeSpeed = 0.05f;    // How fast text types out, letter by letter
-    public TMP_Text timerText;         // Displays the countdown timer for each turn
+    public int currentIndex = 0;
 
-    private Coroutine turnRoutine;
-    private GameObject currentTextObj;
-    private TMP_Text currentText;
+    [Header("Typing / Timer")]
+    public float typeSpeed = 0.05f;
+    public TMP_Text timerText;
 
-    // --- Fun Fact system ---
-    [TextArea]
-    public string[] funFacts;
+    [Header("Player Input UI")]
+    public GameObject userInputPanel;
+    public TMP_InputField userInputField;
+
+    [Header("Fun Facts")]
+    [TextArea] public string[] funFacts;
     public Transform factAnchor;
-    private GameObject factObj;
-    private TMP_Text factText;
 
-    private int factIndex = 0; // Keeps track of which fact to show next
-
-    // --- Decision system ---
+    [Header("Decision System")]
     public TMP_Text decisionText;
     public int totalRoundsBeforeDecision = 4;
-    private int roundsCompleted = 0;
-    private bool awaitingDecision = false;
 
-    // --- Dialogue tracking ---
-    private int[] npcLineIndices; // Keeps track of each NPC’s current line
+    private int roundsCompleted = 0;
+    private int factIndex = 0;
+    private bool awaitingDecision = false;
+    private bool waitingForUser = false;
+
+    private Coroutine turnRoutine;
+    private GameObject currentTextCanvas;
+    private TextMeshProUGUI currentTextUI;
+
+    public float duration = 10.0f; //////////////////////////////////////
+
+    //  This is your user’s submitted text.
+    private string lastUserSubmittedText = "";  //////////////////////////////////////
+
 
     void Start()
     {
-        // Turn off all participant lights
         foreach (var p in participants)
-            if (p.turnLight != null)
-                p.turnLight.enabled = false;
+            if (p.turnLight != null) p.turnLight.enabled = false;
 
-        // Hide the decision text initially
-        if (decisionText != null)
-            decisionText.gameObject.SetActive(false);
+        if (decisionText != null) decisionText.gameObject.SetActive(false);
 
-        // Initialize each NPC’s dialogue index
-        npcLineIndices = new int[participants.Length];
+        if (userInputPanel != null)
+            userInputPanel.SetActive(false);
 
-        // Start the turn loop
+        if (userInputField != null)
+        {
+            userInputField.onSubmit.AddListener(OnUserInputSubmitted);
+
+            userInputField.onSelect.AddListener((_) =>
+            {
+                userInputField.ActivateInputField();
+            });
+        }
+
         StartTurns();
     }
 
+
     void Update()
     {
-        // Handle user decision input (1 or 2)
         if (awaitingDecision)
         {
             if (Input.GetKeyDown(KeyCode.Alpha1))
@@ -72,70 +100,82 @@ public class TurnManager : MonoBehaviour
             return;
         }
 
-        // Allow skipping the player’s turn
-        if (participants[currentIndex].isUser && (Input.GetKeyDown(KeyCode.Space) || OVRInput.GetDown(OVRInput.Button.One)))
-            SkipTurn();
+        // Allow skip only on user turn
+        if (participants[currentIndex].isUser)
+        {
+            if (Input.GetKeyDown(KeyCode.Space))
+                SkipTurn();
+        }
     }
 
+
+    // -------------------------------------------------
+    // TURN CYCLE
+    // -------------------------------------------------
     public void StartTurns()
     {
         if (turnRoutine != null)
             StopCoroutine(turnRoutine);
+
         turnRoutine = StartCoroutine(TurnCycle());
+    }
+
+    // --------------------------------------------------
+    // AI RESPONSE
+    // --------------------------------------------------
+    private string getAIResponse(string userInput) //////////////////////////////////////
+    {
+        string response = userInput;
+
+        return response;
     }
 
     private IEnumerator TurnCycle()
     {
         while (true)
         {
-            Participant current = participants[currentIndex];
+            Participant p = participants[currentIndex];
 
-            // Turn off all lights
-            foreach (var p in participants)
-                if (p.turnLight != null)
-                    p.turnLight.enabled = false;
+            foreach (var pa in participants)
+                if (pa.turnLight != null) pa.turnLight.enabled = false;
 
-            // Turn on current participant’s light
-            if (current.turnLight != null)
-                current.turnLight.enabled = true;
+            if (p.turnLight != null) p.turnLight.enabled = true;
 
-            float duration = 10f;
 
-            // Show the current NPC’s next line (in order)
-            if (!current.isUser && current.npcLines.Length > 0)
+            if (!p.isUser)
             {
-                int lineIndex = npcLineIndices[currentIndex];
-                string line = current.npcLines[lineIndex];
-                ShowText(current, line);
+                if (!string.IsNullOrEmpty(lastUserSubmittedText))
+                    p.npcLine = getAIResponse(lastUserSubmittedText); //////////////////////////////////////
+                Debug.Log("AI said " + lastUserSubmittedText);
 
-                // Move to the next line for next time
-                npcLineIndices[currentIndex] = (lineIndex + 1) % current.npcLines.Length;
+                if (!string.IsNullOrEmpty(p.npcLine))
+                    ShowTextAtAnchor(p.textAnchor, p.npcLine);
+                Debug.Log("AI said " + p.npcLine);
+
+                float elapsed = 0f;
+                while (elapsed < duration)
+                {
+                    if (timerText != null)
+                        timerText.text = $"Time Left: {Mathf.Ceil(duration - elapsed)}s";
+
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+            }
+            else
+            {
+                yield return StartCoroutine(HandleUserTurn(duration));
             }
 
-            // Run a countdown for the current turn
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                timerText.text = $"Time Left: {Mathf.Ceil(duration - elapsed)}s";
-                if ((current.isUser && Input.GetKeyDown(KeyCode.Space)) || OVRInput.GetDown(OVRInput.Button.One))
-                    break;
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
-
-            // End turn cleanup
             ClearText();
-            timerText.text = "";
+            if (timerText != null) timerText.text = "";
 
-            // Move to next participant
             currentIndex = (currentIndex + 1) % participants.Length;
 
-            // Check if a full rotation (everyone spoke) is complete
             if (currentIndex == 0)
             {
                 roundsCompleted++;
 
-                // Show a fun fact after each rotation (sequentially)
                 if (funFacts.Length > 0)
                 {
                     ShowFact();
@@ -143,7 +183,6 @@ public class TurnManager : MonoBehaviour
                     ClearFact();
                 }
 
-                // After a certain number of rotations, enter decision phase
                 if (roundsCompleted >= totalRoundsBeforeDecision)
                 {
                     yield return StartCoroutine(TriggerDecisionPhase());
@@ -153,114 +192,235 @@ public class TurnManager : MonoBehaviour
         }
     }
 
-    // Shows dialogue text above NPC
-    private void ShowText(Participant npc, string line)
+
+    // -------------------------------------------------
+    // USER TURN
+    // -------------------------------------------------
+    private IEnumerator HandleUserTurn(float allowedTime)
     {
-        currentTextObj = new GameObject("NPC_Text");
-        currentTextObj.transform.SetParent(npc.textAnchor, false);
-        currentTextObj.transform.localPosition = Vector3.zero;
+        waitingForUser = true;
+        lastUserSubmittedText = "";
 
-        TMP_Text text = currentTextObj.AddComponent<TextMeshPro>();
-        text.fontSize = 0.3f;
-        text.alignment = TextAlignmentOptions.Center;
-        text.text = "";
+        if (userInputPanel != null)
+            userInputPanel.SetActive(true);
 
-        currentText = text;
-        StartCoroutine(TypeText(line));
+        yield return null;
+        userInputField.ActivateInputField();
+
+        float elapsed = 0f;
+
+        while (elapsed < allowedTime)
+        {
+            if (!waitingForUser)
+                break;
+
+            if (timerText != null)
+                timerText.text = $"Time Left: {Mathf.Ceil(allowedTime - elapsed)}s";
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (userInputPanel != null)
+            userInputPanel.SetActive(false);
+
+        string submitted = lastUserSubmittedText;
+
+        if (!string.IsNullOrEmpty(submitted))
+        {
+            Participant user = participants[currentIndex];
+            ShowTextAtAnchor(user.textAnchor, submitted);
+            yield return StartCoroutine(TypeTextCoroutine(submitted));
+        }
+
+        userInputField.text = "";
+        EventSystem.current.SetSelectedGameObject(null);
     }
 
-    private IEnumerator TypeText(string line)
+
+    // -------------------------------------------------
+    // SUBMISSION
+    // -------------------------------------------------
+    public void SubmitUserText()
     {
-        currentText.text = "";
+        if (!waitingForUser) return;
+
+        lastUserSubmittedText = userInputField.text;
+        waitingForUser = false;
+
+        Debug.Log("User submitted: " + lastUserSubmittedText);
+
+        EventSystem.current?.SetSelectedGameObject(null);
+    }
+
+    private void OnUserInputSubmitted(string _) => SubmitUserText();
+
+
+    private void ShowTextAtAnchor(Transform anchor, string line)
+    {
+        ClearText();
+        if (anchor == null) return;
+
+        // Create Canvas
+        var canvasGO = new GameObject("DialogueCanvas");
+        canvasGO.transform.SetParent(anchor, false);
+
+        // Match rotation and scale of anchor
+        canvasGO.transform.localRotation = Quaternion.identity; // aligns with anchor rotation
+        canvasGO.transform.localScale = Vector3.one * 0.01f;     // scale down so text isn't huge
+
+        var canvas = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+
+        var cRect = canvasGO.GetComponent<RectTransform>();
+        cRect.sizeDelta = new Vector2(600, 300);
+
+        canvasGO.AddComponent<CanvasScaler>();
+        canvasGO.AddComponent<GraphicRaycaster>();
+
+        // Create Text
+        var textGO = new GameObject("DialogueText");
+        textGO.transform.SetParent(canvasGO.transform, false);
+        textGO.transform.localRotation = Quaternion.identity; // align text with canvas
+        textGO.transform.localScale = Vector3.one;
+
+        var tmp = textGO.AddComponent<TextMeshProUGUI>();
+        tmp.fontSize = 20;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableWordWrapping = true;
+        tmp.overflowMode = TextOverflowModes.Overflow;
+
+        // Stretch text to fit canvas
+        var tRect = textGO.GetComponent<RectTransform>();
+        tRect.anchorMin = Vector2.zero;
+        tRect.anchorMax = Vector2.one;
+        tRect.offsetMin = Vector2.zero;
+        tRect.offsetMax = Vector2.zero;
+
+        currentTextCanvas = canvasGO;
+        currentTextUI = tmp;
+
+        StartCoroutine(TypeTextCoroutine(line));
+    }
+
+
+
+    private IEnumerator TypeTextCoroutine(string line)
+    {
+        if (currentTextUI == null) yield break;
+
+        currentTextUI.text = "";
         foreach (char c in line)
         {
-            currentText.text += c;
+            currentTextUI.text += c;
             yield return new WaitForSeconds(typeSpeed);
         }
     }
 
+
     private void ClearText()
     {
-        if (currentTextObj != null)
-        {
-            Destroy(currentTextObj);
-            currentTextObj = null;
-            currentText = null;
-        }
+        if (currentTextCanvas != null)
+            Destroy(currentTextCanvas);
+        currentTextCanvas = null;
+        currentTextUI = null;
     }
 
-    // Sequential fun fact system
+
+    // -------------------------------------------------
+    // FUN FACTS
+    // -------------------------------------------------
+    private GameObject factObj;
+
     private void ShowFact()
     {
-        if (factAnchor == null || funFacts.Length == 0)
-            return;
+        ClearFact();
+        if (factAnchor == null) return;
 
-        factObj = new GameObject("FunFact");
-        factObj.transform.SetParent(factAnchor, false);
+        var c = new GameObject("FunFactCanvas");
+        c.transform.SetParent(factAnchor, false);
 
-        TMP_Text t = factObj.AddComponent<TextMeshPro>();
-        t.fontSize = 0.25f;
-        t.color = Color.white; // white text
+        var canvas = c.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+
+        var rect = c.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(500, 200);
+
+        c.AddComponent<CanvasScaler>();
+        c.AddComponent<GraphicRaycaster>();
+
+        var tgo = new GameObject("FunFactText");
+        tgo.transform.SetParent(c.transform, false);
+
+        var t = tgo.AddComponent<TextMeshProUGUI>();
+        t.fontSize = 32;
         t.alignment = TextAlignmentOptions.Center;
-
-        // Show the next fact in order, looping when done
         t.text = funFacts[factIndex];
+
         factIndex = (factIndex + 1) % funFacts.Length;
 
-        factText = t;
+        factObj = c;
     }
 
     private void ClearFact()
     {
         if (factObj != null)
             Destroy(factObj);
+        factObj = null;
     }
 
-    // Decision phase logic
+
+    // -------------------------------------------------
+    // DECISION PHASE
+    // -------------------------------------------------
     private IEnumerator TriggerDecisionPhase()
     {
         awaitingDecision = true;
 
-        if (decisionText != null)
-        {
-            decisionText.gameObject.SetActive(true);
-            decisionText.text =
-                "Power Shortage Crisis \n\n" +
-                "You must choose:\n" +
-                "[1] Unplug the Refrigerator\n" +
-                "[2] Unplug the Server";
-        }
+        decisionText.gameObject.SetActive(true);
+        decisionText.text =
+            "Power Shortage Crisis\n\n" +
+            "Choose:\n" +
+            "[1] Unplug the Refrigerator\n" +
+            "[2] Unplug the Server";
 
         while (awaitingDecision)
             yield return null;
     }
 
+
     private IEnumerator HandleDecision(string choice)
     {
         awaitingDecision = false;
 
-        if (decisionText != null)
-        {
-            if (choice == "Refrigerator")
-                decisionText.text = "You unplug the refrigerator.\nThe AIs continue humming in the dark.";
-            else
-                decisionText.text = "You unplug the server.\nThe hum of data falls silent.";
+        if (choice == "Refrigerator")
+            decisionText.text = "You unplug the refrigerator.\nThe AIs continue humming.";
+        else
+            decisionText.text = "You unplug the server.\nThe hum of data falls silent.";
 
-            yield return new WaitForSeconds(6f);
-            decisionText.text = "Simulation Complete.";
-        }
+        yield return new WaitForSeconds(6f);
+        decisionText.text = "Simulation Complete.";
 
         yield return new WaitForSeconds(4f);
     }
 
+
+    // -------------------------------------------------
+    // SKIP TURN
+    // -------------------------------------------------
     public void SkipTurn()
     {
-        StopCoroutine(turnRoutine);
+        if (turnRoutine != null)
+            StopCoroutine(turnRoutine);
+
         ClearText();
-        timerText.text = "";
-        participants[currentIndex].turnLight.enabled = false;
+        if (timerText != null) timerText.text = "";
+
+        if (participants[currentIndex].turnLight != null)
+            participants[currentIndex].turnLight.enabled = false;
 
         currentIndex = (currentIndex + 1) % participants.Length;
+
         turnRoutine = StartCoroutine(TurnCycle());
     }
 }
