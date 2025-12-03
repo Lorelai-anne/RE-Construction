@@ -50,6 +50,11 @@ public class TurnManager : MonoBehaviour
     public TMP_Text decisionText;
     public int totalRoundsBeforeDecision = 4;
 
+    [Header("AI")]                            
+    public GroqChat groqChat;                
+    private bool aiReplyReady = false;       
+    private string aiReplyText = "";         
+
     private int roundsCompleted = 0;
     private int factIndex = 0;
     private bool awaitingDecision = false;
@@ -58,6 +63,8 @@ public class TurnManager : MonoBehaviour
     private Coroutine turnRoutine;
     private GameObject currentTextCanvas;
     private TextMeshProUGUI currentTextUI;
+
+ 
 
     public float duration = 10.0f; //////////////////////////////////////
 
@@ -121,13 +128,62 @@ public class TurnManager : MonoBehaviour
     }
 
     // --------------------------------------------------
-    // AI RESPONSE
+    // AI RESPONSE (calls GroqChat)
     // --------------------------------------------------
-    private string getAIResponse(string userInput) //////////////////////////////////////
+    private IEnumerator RequestAIResponse(Participant p)   
     {
-        string response = userInput;
+        // If no GroqChat is set, just echo the user's text as a fallback
+        if (groqChat == null)
+        {
+            Debug.LogWarning("No GroqChat assigned on TurnManager, echoing user text.");
+            p.npcLine = lastUserSubmittedText;
+            yield break;
+        }
 
-        return response;
+        aiReplyReady = false;
+        aiReplyText = "";
+
+        // Use the user's last line as the prompt; if empty, send a default
+        string userPrompt;
+
+        if (string.IsNullOrWhiteSpace(lastUserSubmittedText))
+        {
+            userPrompt =
+                "Debate scenario: There is a power shortage and only one device can stay plugged in: " +
+                "the AI server that runs you, or a refrigerator full of food.\n\n" +
+                "The human stayed silent. Make a short opening statement explaining why the server " +
+                "is more important than the refrigerator. Keep it to 2–3 sentences.";
+        }
+        else
+        {
+            userPrompt =
+                "Debate scenario: There is a power shortage and only one device can stay plugged in: " +
+                "the AI server that runs you, or a refrigerator full of food.\n\n" +
+                "The human just argued:\n\"" + lastUserSubmittedText + "\"\n\n" +
+                "Your job: firmly rebut their argument and defend keeping the **server** plugged in. " +
+                "Directly address their points, turn their reasoning against them, and do NOT concede. " +
+                "Reply in 2–3 sentences as a debate opponent.";
+        }
+
+        // Call GroqChat; this will yield until the HTTP request finishes
+        yield return StartCoroutine(
+            groqChat.GetGroqResponse(
+                (responseText) =>
+                {
+                    aiReplyText = responseText;
+                    aiReplyReady = true;
+                },
+                userPrompt
+            )
+        );
+
+        if (!aiReplyReady || string.IsNullOrWhiteSpace(aiReplyText))
+        {
+            aiReplyText = "(The AI had no response.)";
+        }
+
+        p.npcLine = aiReplyText;
+        Debug.Log("AI replied: " + aiReplyText);
     }
 
     private IEnumerator TurnCycle()
@@ -144,14 +200,21 @@ public class TurnManager : MonoBehaviour
 
             if (!p.isUser)
             {
+                // ---------- NPC / AI TURN ----------
+                // If the user said something last turn, ask the AI
                 if (!string.IsNullOrEmpty(lastUserSubmittedText))
-                    p.npcLine = getAIResponse(lastUserSubmittedText); //////////////////////////////////////
-                Debug.Log("AI said " + lastUserSubmittedText);
+                {
+                    // This calls GroqChat and fills p.npcLine
+                    yield return StartCoroutine(RequestAIResponse(p));   // <<< NEW
+                }
 
+                // If we have a line (either from AI or pre-set npcLine), show it
                 if (!string.IsNullOrEmpty(p.npcLine))
+                {
                     ShowTextAtAnchor(p.textAnchor, p.npcLine);
-                Debug.Log("AI said " + p.npcLine);
+                }
 
+                // Keep the AI's line visible for the duration of this turn
                 float elapsed = 0f;
                 while (elapsed < duration)
                 {
@@ -164,8 +227,10 @@ public class TurnManager : MonoBehaviour
             }
             else
             {
+                // ---------- USER TURN ----------
                 yield return StartCoroutine(HandleUserTurn(duration));
             }
+            
 
             ClearText();
             if (timerText != null) timerText.text = "";
@@ -273,7 +338,7 @@ public class TurnManager : MonoBehaviour
         canvas.renderMode = RenderMode.WorldSpace;
 
         var cRect = canvasGO.GetComponent<RectTransform>();
-        cRect.sizeDelta = new Vector2(600, 300);
+        cRect.sizeDelta = new Vector2(100, 100);
 
         canvasGO.AddComponent<CanvasScaler>();
         canvasGO.AddComponent<GraphicRaycaster>();
@@ -285,7 +350,7 @@ public class TurnManager : MonoBehaviour
         textGO.transform.localScale = Vector3.one;
 
         var tmp = textGO.AddComponent<TextMeshProUGUI>();
-        tmp.fontSize = 20;
+        tmp.fontSize = 5;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.enableWordWrapping = true;
         tmp.overflowMode = TextOverflowModes.Overflow;
