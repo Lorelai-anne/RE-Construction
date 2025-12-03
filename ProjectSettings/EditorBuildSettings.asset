@@ -12,6 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Besu.unity
     guid: 2aa654cb7a803a147977212e21f295e5
   m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 5d1af982727a89d46aa7a6ce213ade5a, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: f153d4af6e4fbe540a5e44aa8a6bc5f8, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 462c3f27839d4fb498585cfb50c296ec, type: 2}
