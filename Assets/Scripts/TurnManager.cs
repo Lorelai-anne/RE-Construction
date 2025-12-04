@@ -27,7 +27,7 @@ public class TurnManager : MonoBehaviour
         public Light turnLight;
         public bool isUser;
         [TextArea] public string npcLine;  //////////////////////////////////////
-        public Transform textAnchor;
+        public TextMeshProUGUI textMesh;
     }
 
     [Header("Participants")]
@@ -110,7 +110,7 @@ public class TurnManager : MonoBehaviour
         // Allow skip only on user turn
         if (participants[currentIndex].isUser)
         {
-            if (Input.GetKeyDown(KeyCode.LeftShift) || OVRInput.Get(OVRInput.Button.One))
+            if (Input.GetKeyDown(KeyCode.LeftShift) || OVRInput.GetDown(OVRInput.Button.One))
                 SkipTurn();
         }
     }
@@ -211,7 +211,7 @@ public class TurnManager : MonoBehaviour
                 // If we have a line (either from AI or pre-set npcLine), show it
                 if (!string.IsNullOrEmpty(p.npcLine))
                 {
-                    ShowTextAtAnchor(p.textAnchor, p.npcLine);
+                    ShowTextAtAnchor(p.npcLine);
                 }
 
                 // Keep the AI's line visible for the duration of this turn
@@ -294,7 +294,7 @@ public class TurnManager : MonoBehaviour
         if (!string.IsNullOrEmpty(submitted))
         {
             Participant user = participants[currentIndex];
-            ShowTextAtAnchor(user.textAnchor, submitted);
+            ShowTextAtAnchor(submitted);
             yield return StartCoroutine(TypeTextCoroutine(submitted));
         }
 
@@ -321,52 +321,22 @@ public class TurnManager : MonoBehaviour
     private void OnUserInputSubmitted(string _) => SubmitUserText();
 
 
-    private void ShowTextAtAnchor(Transform anchor, string line)
+    private void ShowTextAtAnchor(string line)
     {
         ClearText();
-        if (anchor == null) return;
 
-        // Create Canvas
-        var canvasGO = new GameObject("DialogueCanvas");
-        canvasGO.transform.SetParent(anchor, false);
+        // We no longer use the anchor — we use the participant’s pre-placed TextMeshPro
+        // anchor is ignored but kept so you don't have to change anything else
 
-        // Match rotation and scale of anchor
-        canvasGO.transform.localRotation = Quaternion.identity; // aligns with anchor rotation
-        canvasGO.transform.localScale = Vector3.one * 0.01f;     // scale down so text isn't huge
+        Participant p = participants[currentIndex];
+        if (p.textMesh == null) return;
 
-        var canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.WorldSpace;
-
-        var cRect = canvasGO.GetComponent<RectTransform>();
-        cRect.sizeDelta = new Vector2(100, 100);
-
-        canvasGO.AddComponent<CanvasScaler>();
-        canvasGO.AddComponent<GraphicRaycaster>();
-
-        // Create Text
-        var textGO = new GameObject("DialogueText");
-        textGO.transform.SetParent(canvasGO.transform, false);
-        textGO.transform.localRotation = Quaternion.identity; // align text with canvas
-        textGO.transform.localScale = Vector3.one;
-
-        var tmp = textGO.AddComponent<TextMeshProUGUI>();
-        tmp.fontSize = 5;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableWordWrapping = true;
-        tmp.overflowMode = TextOverflowModes.Overflow;
-
-        // Stretch text to fit canvas
-        var tRect = textGO.GetComponent<RectTransform>();
-        tRect.anchorMin = Vector2.zero;
-        tRect.anchorMax = Vector2.one;
-        tRect.offsetMin = Vector2.zero;
-        tRect.offsetMax = Vector2.zero;
-
-        currentTextCanvas = canvasGO;
-        currentTextUI = tmp;
+        currentTextUI = p.textMesh;
+        currentTextUI.text = "";
 
         StartCoroutine(TypeTextCoroutine(line));
     }
+
 
 
 
@@ -385,10 +355,12 @@ public class TurnManager : MonoBehaviour
 
     private void ClearText()
     {
-        if (currentTextCanvas != null)
-            Destroy(currentTextCanvas);
-        currentTextCanvas = null;
+        if (currentTextUI != null)
+            currentTextUI.text = "";
+
         currentTextUI = null;
+        currentTextCanvas = null;   // unused but kept for safety
+
     }
 
 
@@ -487,5 +459,7 @@ public class TurnManager : MonoBehaviour
         currentIndex = (currentIndex + 1) % participants.Length;
 
         turnRoutine = StartCoroutine(TurnCycle());
+
+        lastUserSubmittedText = "I skipped my turn but please continue your arguement";
     }
 }
