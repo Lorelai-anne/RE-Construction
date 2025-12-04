@@ -110,7 +110,7 @@ public class TurnManager : MonoBehaviour
         // Allow skip only on user turn
         if (participants[currentIndex].isUser)
         {
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKeyDown(KeyCode.LeftShift) || OVRInput.Get(OVRInput.Button.One))
                 SkipTurn();
         }
     }
@@ -152,7 +152,7 @@ public class TurnManager : MonoBehaviour
                 "Debate scenario: There is a power shortage and only one device can stay plugged in: " +
                 "the AI server that runs you, or a refrigerator full of food.\n\n" +
                 "The human stayed silent. Make a short opening statement explaining why the server " +
-                "is more important than the refrigerator. Keep it to 2–3 sentences.";
+                "is more important than the refrigerator. Keep it to 1-2 sentences";
         }
         else
         {
@@ -162,7 +162,7 @@ public class TurnManager : MonoBehaviour
                 "The human just argued:\n\"" + lastUserSubmittedText + "\"\n\n" +
                 "Your job: firmly rebut their argument and defend keeping the **server** plugged in. " +
                 "Directly address their points, turn their reasoning against them, and do NOT concede. " +
-                "Reply in 2–3 sentences as a debate opponent.";
+                "Reply in 1-2 sentences as a debate opponent";
         }
 
         // Call GroqChat; this will yield until the HTTP request finishes

@@ -28,7 +28,7 @@ public class GroqChat : MonoBehaviour
 {
     [Header("Personality Settings")]
     [TextArea] public string personalityPrompt = "You are a helpful AI."; 
-    [TextArea] public string defaultUserPrompt = "Continue the conversation logically.";
+    [TextArea] public string defaultUserPrompt = "Continue the conversation logically and keep you response to about one to two sentences and very short";
 
     [Header("API Settings")]
     private string apiKey = ""; 
