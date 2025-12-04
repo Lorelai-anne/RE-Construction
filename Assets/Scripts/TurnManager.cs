@@ -100,9 +100,9 @@ public class TurnManager : MonoBehaviour
     {
         if (awaitingDecision)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1))
+            if (Input.GetKeyDown(KeyCode.Alpha1) || OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger))
                 StartCoroutine(HandleDecision("Refrigerator"));
-            if (Input.GetKeyDown(KeyCode.Alpha2))
+            if (Input.GetKeyDown(KeyCode.Alpha2) || OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
                 StartCoroutine(HandleDecision("Server"));
             return;
         }
@@ -309,6 +309,11 @@ public class TurnManager : MonoBehaviour
     public void SubmitUserText()
     {
         if (!waitingForUser) return;
+
+        if(userInputField.text == null || userInputField.text.Length == 0)
+        {
+            userInputField.text = "I am a god amongst mortals";
+        }
 
         lastUserSubmittedText = userInputField.text;
         waitingForUser = false;
