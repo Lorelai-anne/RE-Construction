@@ -64,7 +64,10 @@ public class TurnManager : MonoBehaviour
     private GameObject currentTextCanvas;
     private TextMeshProUGUI currentTextUI;
 
- 
+    [Header("Voice")]
+    public VoiceToTextManager voiceInput;
+
+
 
     public float duration = 10.0f; //////////////////////////////////////
 
@@ -91,6 +94,10 @@ public class TurnManager : MonoBehaviour
                 userInputField.ActivateInputField();
             });
         }
+
+        if (voiceInput != null)
+            voiceInput.Initialize(this);
+
 
         StartTurns();
     }
@@ -152,7 +159,7 @@ public class TurnManager : MonoBehaviour
                 "Debate scenario: There is a power shortage and only one device can stay plugged in: " +
                 "the AI server that runs you, or a refrigerator full of food.\n\n" +
                 "The human stayed silent. Make a short opening statement explaining why the server " +
-                "is more important than the refrigerator. Keep it to 1-2 sentences";
+                "is more important than the refrigerator. Keep it to 1-2 sentences, maximum of 240 characeters";
         }
         else
         {
@@ -162,7 +169,7 @@ public class TurnManager : MonoBehaviour
                 "The human just argued:\n\"" + lastUserSubmittedText + "\"\n\n" +
                 "Your job: firmly rebut their argument and defend keeping the **server** plugged in. " +
                 "Directly address their points, turn their reasoning against them, and do NOT concede. " +
-                "Reply in 1-2 sentences as a debate opponent";
+                "Reply in 1-2 sentences as a debate opponent, maximum of 240 characters";
         }
 
         // Call GroqChat; this will yield until the HTTP request finishes
@@ -261,6 +268,9 @@ public class TurnManager : MonoBehaviour
     // -------------------------------------------------
     // USER TURN
     // -------------------------------------------------
+    // -------------------------------------------------
+    // USER TURN
+    // -------------------------------------------------
     private IEnumerator HandleUserTurn(float allowedTime)
     {
         waitingForUser = true;
@@ -269,15 +279,36 @@ public class TurnManager : MonoBehaviour
         if (userInputPanel != null)
             userInputPanel.SetActive(true);
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+    // VR MODE — Voice to text
+    if (userInputPanel != null)
+        userInputPanel.SetActive(false); // hide textbox
+#else
+        // Desktop mode — normal input box
+        if (userInputPanel != null)
+            userInputPanel.SetActive(true);
         yield return null;
         userInputField.ActivateInputField();
+#endif
+
+        // Give one frame for UI/XR to initialize so the timer and pointer state start correctly
+        yield return null;
 
         float elapsed = 0f;
+
+        // Initialize timer display immediately
+        if (timerText != null)
+            timerText.text = $"Time Left: {Mathf.Ceil(allowedTime)}s";
 
         while (elapsed < allowedTime)
         {
             if (!waitingForUser)
                 break;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (voiceInput != null)
+            voiceInput.UpdateDictation();
+#endif
 
             if (timerText != null)
                 timerText.text = $"Time Left: {Mathf.Ceil(allowedTime - elapsed)}s";
@@ -300,6 +331,17 @@ public class TurnManager : MonoBehaviour
 
         userInputField.text = "";
         EventSystem.current.SetSelectedGameObject(null);
+    }
+
+
+    public void SubmitDictatedText(string text)
+    {
+        if (!waitingForUser) return;
+
+        lastUserSubmittedText = text;
+        waitingForUser = false;
+
+        Debug.Log("Voice submitted: " + lastUserSubmittedText);
     }
 
 
